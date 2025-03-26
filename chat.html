@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>和“智微医道”对话</title>
     <link rel="icon" type="image/x-icon" href="image/favicon.ico">
     <style>
@@ -436,7 +436,7 @@
 
         .message-content {
             background-color: #f0f2f5;
-            padding: 12px 16px;
+            padding: 12px;
             border-radius: 18px;
             font-size: 0.95rem;
             max-width: calc(100% - 56px);
@@ -447,6 +447,7 @@
         }
 
         .ai-message .message-content {
+            line-height: 24px;
             background-color: #f5f0ff;
         }
 
@@ -562,6 +563,28 @@
                 /* margin-top: 15px; */
             }
         }
+        .AITip {
+            border: solid 1px rgba(228, 119, 61, .1);
+            background-color: rgba(228, 119, 61, .05);
+            border-radius: 12px;
+            align-items: center;
+            width: fit-content;
+            margin-top: 10px;
+            padding: 6px 12px;
+            display: flex;
+            gap: 12px;
+        }
+        .AITip .icon {
+            font-size: 16px;
+            width: 16px;
+            height: 16px;
+        }
+        .AITip .txt {
+            color: #e4773d;
+            font-size: 14px;
+            font-weight: 500;
+            line-height: 28px;
+        }
     </style>
 </head>
 
@@ -579,7 +602,7 @@
                 <button class="header-button" onclick="redirectToSomePage()">
                     <span class="fas fa-arrow-left">返回</span>
                 </button>
-                智微医道
+                <div>智微医道</div>
             </div>
             <div class="conversation-container" id="conversation">
                 <!-- 聊天内容将动态添加到这里 -->
@@ -590,8 +613,7 @@
                 <span></span>
             </div>
             <div class="input-container">
-                <input type="text" class="message-input" id="message-input" placeholder="Type your message here..."
-                    autocomplete="off">
+                <input type="text" class="message-input" id="message-input" placeholder="给智微医道发送消息 ..." autocomplete="off">
                 <button class="send-button" id="send-button">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                         stroke-linecap="round" stroke-linejoin="round">
@@ -631,8 +653,7 @@
             <div class="modal-content">
                 <span class="close" onclick="closeModal()">&times;</span>
                 <p><strong>介绍：</strong></p>
-                <p> 智微医道精通多个关键领域，在疾病诊断方面，无论是常见疾病如感冒、咳嗽的症状判断，还是复杂病症如心血管疾病、肿瘤相关知识，它都能依据症状表现辅助分析可能病因；在药物信息层面，对于各类药物的功效、用法用量、副作用以及药物相互作用等内容都能详细解答。
-                </p>
+                <p> 智微医道精通多个关键领域，在疾病诊断方面，无论是常见疾病如感冒、咳嗽的症状判断，还是复杂病症如心血管疾病、肿瘤相关知识，它都能依据症状表现辅助分析可能病因；在药物信息层面，对于各类药物的功效、用法用量、副作用以及药物相互作用等内容都能详细解答。</p>
                 <p><strong>使用示范：</strong></p>
                 <p><strong>用户：</strong> 我最近感觉头痛，怎么办？</p>
                 <p><strong>AI：</strong> 头痛可能由多种原因引起，建议您先休息一下，如果症状持续，请及时就医。</p>
@@ -744,7 +765,27 @@
                 modal.style.display = 'none';
             }
         </script>
+        <!-- 引入 marked.js -->
+        <script type="text/javascript" src="./js/markdown.min.js"></script>
         <script>
+
+            // 处理markdown格式
+            const Markdown = marked.setOptions({
+                renderer: new marked.Renderer(),
+                gfm: true,
+                tables: true,
+                breaks: false,
+                pedantic: false,
+                sanitize: false,
+                smartLists: true,
+                smartypants: false,
+                highlight: function (code,lang) {
+                    //使用 highlight 插件解析文档中代码部分
+                    return hljs.highlightAuto(code,[lang]).value;
+                }
+            });
+            
+
             function redirectToSomePage() {
                 window.location.href = 'index.html';
             }
@@ -784,9 +825,10 @@
                 const messageInput = document.getElementById('message-input');
                 const sendButton = document.getElementById('send-button');
                 const typingIndicator = document.getElementById('typing-indicator');
+                let AITIP = true;
 
                 // Add welcome message when page loads
-                addMessage(" 您好！我是医疗AI助手，请问有什么可以帮助您的？", 'ai');
+                addMessage(" 您好！我是医疗AI助手，请问有什么可以帮助您的？", 'ai', 'base-msg-'+Date.now());
 
                 // Event listeners
                 sendButton.addEventListener('click', sendMessage);
@@ -805,27 +847,203 @@
                     previousQuestions.push(messageText);
 
                     // 添加用户消息到聊天对话框
-                    addMessage(messageText, 'user');
+                    addMessage(messageText, 'user', 'base-msg-'+Date.now());
                     messageInput.value = '';
 
                     // 显示“正在输入”提示
                     typingIndicator.style.display = 'block';
                     conversationContainer.scrollTop = conversationContainer.scrollHeight;
 
-                    // 模拟 AI 回复延迟，这个地方要修改成可以和本地部署的模型对话
-                    setTimeout(() => {
+                    // 发起 Fetch 请求
+                    setTimeout(async () => {
+                        let baseUrl = 'https://n4o-8tm.proxy-hz.gpuez.com/api/generate'
+                        const response = await fetch(baseUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                model: 'qwen2.5:7b-gpuez',  // 模型名称
+                                prompt: messageText,    // 输入提示
+                                stream: true,           // 启用流式响应
+                            }),
+                        });
+
                         // 隐藏“正在输入”提示
                         typingIndicator.style.display = 'none';
+                        let ohtmlStr = '';
+                        let idNow = 'message-' + Date.now()
+                        /**************************  自行甄别提示 **************************/
+                        if(AITIP) {
+                            ohtmlStr = `<div style="font-size: 18px;font-weight: 600;margin: 12px 0px;">根据您提供的信息，我为您提供以下医疗分析和建议：</div>` 
+                        }
+                        addMessage('', 'ai', idNow);
+                        // 获取可读流
+                        const reader = response.body.getReader();
+                        const decoder = new TextDecoder();
+                        let buffer = ''; // 用于存储不完整的JSON对象
+                        // 逐步读取数据
+                        while (true) {
+                            const { done, value } = await reader.read();
+                            if (done) {
+                                console.log('Stream ended');
+                                break; // 如果流结束，退出循环
+                            }
+                            // 解码并处理数据
+                            buffer += decoder.decode(value);
 
-                        // 在实际应用中，这里会调用 AI API
-                        // 这里使用一个固定的回复作为示例
-                        const aiResponse = "感谢您提供的信息！根据您的描述，建议您尽快就医，并注意休息。如果需要进一步的帮助，请随时告诉我。";
-                        addMessage(aiResponse, 'ai');
-                    }, 1500);
+                            // 按行拆分缓冲区
+                            const lines = buffer.split('\n');
+                            buffer = lines.pop(); // 最后一行可能不完整，保留在缓冲区中
+
+                            // 处理每一行
+                            for (const line of lines) {
+                                try {
+                                    const data = JSON.parse(line);
+                                    if (data.response) {
+                                        // 提取内容并更新 UI
+                                        ohtmlStr += data.response;
+                                        updateMessage(idNow, ohtmlStr);
+                                    }
+                                } catch (error) {
+                                    console.error('JSON parsing error:', error);
+                                }
+                            }
+                        }
+                        // console.log(ohtmlStr);
+
+                        /**************************  自行甄别提示 **************************/
+                        if(AITIP) {
+                            let tipHtml = `<div class="AITip">
+                                <div class="icon">
+                                    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <path fill-rule="evenodd" clip-rule="evenodd" d="M9 16.7A7.7 7.7 0 1 0 9 1.3a7.7 7.7 0 0 0 0 15.4zM9 18A9 9 0 1 0 9 0a9 9 0 0 0 0 18z" fill="#E4773D"></path>
+                                        <path fill-rule="evenodd" clip-rule="evenodd" d="M9 13a.857.857 0 0 1-.857-.857V8.57a.857.857 0 1 1 1.714 0v3.572A.857.857 0 0 1 9 13zM9 6.714A.857.857 0 1 1 9 5a.857.857 0 0 1 0 1.714z" fill="#E4773D"></path>
+                                    </svg>
+                                </div>
+                                <div class="txt">本回答由 AI 生成，内容仅供参考，请仔细甄别。</div>
+                            </div>`
+                            const mesEle = document.getElementById(idNow);
+                            mesEle.innerHTML += tipHtml;
+                        }
+
+                    }, 1000);
+
+
+
                 }
 
+                /************************** deepseek-chat **************************/
+                function sendMessageDeepseek() {
+                    const messageText = messageInput.value.trim();
+                    if (messageText === '') return;
+
+                    // 将用户的问题存储到之前的问题列表中
+                    previousQuestions.push(messageText);
+
+                    // 添加用户消息到聊天对话框
+                    addMessage(messageText, 'user', 'base-msg-'+Date.now());
+                    messageInput.value = '';
+
+                    // 显示“正在输入”提示
+                    typingIndicator.style.display = 'block';
+                    conversationContainer.scrollTop = conversationContainer.scrollHeight;
+                    
+                    // 发起 Fetch 请求
+                    setTimeout(async () => {
+
+                        // deepseek API
+                        let baseUrl = ''
+                        const response = await fetch(baseUrl, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                model: "deepseek-chat",
+                                messages: [{ role: "system", content: messageText }],
+                                stream: true, // 启用流式响应
+                            })
+                        });
+
+                        // 隐藏“正在输入”提示
+                        typingIndicator.style.display = 'none';
+                        let ohtmlStr = '';
+                        let idNow = 'message-' + Date.now()
+
+                        /**************************  自行甄别提示 **************************/
+                        if(AITIP) {
+                            ohtmlStr = `<div style="font-size: 18px;font-weight: 600;margin: 12px 0px;">根据您提供的信息，我为您提供以下医疗分析和建议：</div>` 
+                        }
+                        addMessage('', 'ai', idNow);
+
+                        // 获取可读流
+                        const reader = response.body.getReader();
+                        const decoder = new TextDecoder('utf-8');
+                        let buffer = '';
+                        while (true) {
+                            const { done, value } = await reader.read();
+                            if (done) break;
+
+                            // 解码当前块（流式模式）
+                            buffer += decoder.decode(value, { stream: true });
+
+                            // 按行拆分缓冲区
+                            const lines = buffer.split('\n');
+                            buffer = lines.pop(); // 最后一行可能不完整，保留在缓冲区中
+
+                            // 处理每一行
+                            for (const line of lines) {
+                                if (line.startsWith('data: ')) {
+                                    const jsonString = line.slice(6); // 去掉 'data: ' 前缀
+                                    if (jsonString.trim() === '[DONE]') {
+                                        break;
+                                    }
+                                    try {
+                                        const data = JSON.parse(jsonString);
+                                        // console.log('Received data:', data);
+                                        // 提取内容并更新 UI
+                                        if (data.choices && data.choices[0].delta.content) {
+                                            ohtmlStr += data.choices[0].delta.content;
+                                            updateMessage(idNow, ohtmlStr);
+                                        }
+                                    } catch (error) {
+                                        console.error('JSON parsing error:', error);
+                                    }
+                                }
+                            }
+                        }
+                        // 解码缓冲区中剩余的数据（如果有）
+                        if (buffer) {
+                            const finalData = decoder.decode(); // 注意：这里不需要 { stream: true }
+                            console.log('Final data:', finalData);
+                        }
+
+                        /**************************  自行甄别提示 **************************/
+                        if(AITIP) {
+                            let tipHtml = `<div class="AITip">
+                                <div class="icon">
+                                    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <path fill-rule="evenodd" clip-rule="evenodd" d="M9 16.7A7.7 7.7 0 1 0 9 1.3a7.7 7.7 0 0 0 0 15.4zM9 18A9 9 0 1 0 9 0a9 9 0 0 0 0 18z" fill="#E4773D"></path>
+                                        <path fill-rule="evenodd" clip-rule="evenodd" d="M9 13a.857.857 0 0 1-.857-.857V8.57a.857.857 0 1 1 1.714 0v3.572A.857.857 0 0 1 9 13zM9 6.714A.857.857 0 1 1 9 5a.857.857 0 0 1 0 1.714z" fill="#E4773D"></path>
+                                    </svg>
+                                </div>
+                                <div class="txt">本回答由 AI 生成，内容仅供参考，请仔细甄别。</div>
+                            </div>`
+                            const mesEle = document.getElementById(idNow);
+                            mesEle.innerHTML += tipHtml;
+                        }
+                    }, 1000);
+
+                }
+
+
+
                 // Function to add a message to the conversation
-                function addMessage(text, sender) {
+                function addMessage(text, sender, idNow) {
+
+                    if(sender=='user') {
+                        AITIP = text.indexOf('请根据我提供的信息给出医疗分析和建议') > -1 ?  true : false;
+                    }
+
                     const messageElement = document.createElement('div');
                     messageElement.classList.add('message', `${sender}-message`);
 
@@ -844,6 +1062,7 @@
 
                     const contentElement = document.createElement('div');
                     contentElement.classList.add('message-content');
+                    contentElement.id = idNow; // 为每条消息添加唯一ID
 
                     // Process text to handle markdown-style formatting
                     text = processText(text);
@@ -856,8 +1075,23 @@
                     conversationContainer.scrollTop = conversationContainer.scrollHeight;
                 }
 
+                // 更新消息显示函数,支持打字机效果
+                function updateMessage(messageId, ohtmlStr) {
+                    const messageElement = document.getElementById(messageId);
+                    if (messageElement) {
+                        // 处理markdown格式
+                        let text = Markdown(ohtmlStr)
+                        messageElement.innerHTML = text;
+
+                        // document.querySelectorAll('pre code').forEach((block) => hljs.highlightBlock(block))
+
+                    }
+                    conversationContainer.scrollTop = conversationContainer.scrollHeight;
+                }
+
                 // Function to process text and handle basic formatting
                 function processText(text) {
+                    
                     // Handle code blocks
                     text = text.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
 
@@ -879,6 +1113,9 @@
                     // Convert line breaks to <br>
                     text = text.replace(/\n/g, '<br>');
 
+                    // Convert tabs to four spaces
+                    text = text.replace(/\t/g, '    ');
+
                     return text;
                 }
 
@@ -897,7 +1134,7 @@
                     conversationContainer.appendChild(initialMessage);
                 } else {
                     // 如果没有初始消息，重新添加
-                    addMessage("您好！我是医疗AI助手，请问有什么可以帮助您的？", 'ai');
+                    addMessage("您好！我是医疗AI助手，请问有什么可以帮助您的？", 'ai', 'base-msg-'+Date.now());
                 }
             }
             // 重新回答最后一个问题
